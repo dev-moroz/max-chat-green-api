@@ -53,20 +53,3 @@
   color: var(--color-text-muted);
   font-size: 13px;
 }
-
-.feed {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-.empty {
-  margin: auto;
-  padding: 6px 14px;
-  border-radius: 14px;
-  background: var(--color-surface);
-  color: var(--color-text-muted);
-  font-size: 14px;
-}

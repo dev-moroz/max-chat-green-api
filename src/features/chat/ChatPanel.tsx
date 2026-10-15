@@ -1,6 +1,10 @@
 import { chatTitle, useChatStore } from '../../store/chatStore'
+import { getApiClient } from '../../store/sessionStore'
 import { Avatar } from '../../shared/ui/Avatar'
 import { formatPhone } from '../../shared/lib/phone'
+import { Composer } from './Composer'
+import { MessageFeed } from './MessageFeed'
+import { retryMessage, sendMessage } from './sendMessage'
 import styles from './ChatPanel.module.css'
 
 interface ChatPanelProps {
@@ -8,7 +12,6 @@ interface ChatPanelProps {
   onBack(): void
 }
 
-/** Окно переписки. Лента сообщений и поле ввода — этап 6. */
 export function ChatPanel({ chatId, onBack }: ChatPanelProps) {
   const chat = useChatStore((s) => s.chats[chatId])
   if (!chat) return null
@@ -28,9 +31,12 @@ export function ChatPanel({ chatId, onBack }: ChatPanelProps) {
           <span className={styles.subtitle}>{subtitle}</span>
         </div>
       </header>
-      <div className={styles.feed}>
-        <p className={styles.empty}>Сообщений пока нет</p>
-      </div>
+      <MessageFeed
+        chatId={chatId}
+        messages={chat.messages}
+        onRetry={(localId) => void retryMessage(chatId, localId, getApiClient())}
+      />
+      <Composer key={chatId} onSend={(text) => void sendMessage(chatId, text, getApiClient())} />
     </section>
   )
 }
