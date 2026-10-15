@@ -40,6 +40,20 @@ describe('createGreenApiClient', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ chatId: '10000000', message: 'Привет' })
   })
 
+  it('читает и обновляет настройки уведомлений', async () => {
+    const getFetch = mockFetch(200, '{"incomingWebhook":"no","webhookUrl":""}')
+    await expect(createGreenApiClient(credentials, getFetch).getSettings()).resolves.toMatchObject({
+      incomingWebhook: 'no',
+    })
+    expect(getFetch.mock.calls[0][0]).toMatch(/\/getSettings\/secret-token$/)
+
+    const setFetch = mockFetch(200, '{"saveSettings":true}')
+    await createGreenApiClient(credentials, setFetch).setSettings({ incomingWebhook: 'yes' })
+    expect(setFetch.mock.calls[0][0]).toMatch(/\/setSettings\/secret-token$/)
+    expect(setFetch.mock.calls[0][1]?.method).toBe('POST')
+    expect(JSON.parse(String(setFetch.mock.calls[0][1]?.body))).toEqual({ incomingWebhook: 'yes' })
+  })
+
   it('receiveNotification возвращает null на пустой очереди', async () => {
     const client = createGreenApiClient(credentials, mockFetch(200, 'null'))
     await expect(client.receiveNotification()).resolves.toBeNull()

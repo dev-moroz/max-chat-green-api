@@ -4,6 +4,8 @@ import type {
   CheckAccountResult,
   Credentials,
   HistoryItem,
+  InstanceSettings,
+  NotificationSettings,
   ReceivedNotification,
   SendMessageResponse,
   StateInstanceResponse,
@@ -17,6 +19,8 @@ export const MAX_MESSAGE_LENGTH = 4000
 
 export interface GreenApiClient {
   getStateInstance(signal?: AbortSignal): Promise<StateInstanceResponse>
+  getSettings(signal?: AbortSignal): Promise<InstanceSettings>
+  setSettings(settings: NotificationSettings, signal?: AbortSignal): Promise<void>
   checkAccount(phoneNumber: string, signal?: AbortSignal): Promise<CheckAccountResult>
   sendMessage(chatId: string, message: string, signal?: AbortSignal): Promise<SendMessageResponse>
   /** Возвращает null, если за время long-poll уведомлений не пришло */
@@ -85,6 +89,12 @@ export function createGreenApiClient(
   return {
     getStateInstance: (signal) =>
       request<StateInstanceResponse>('getStateInstance', { method: 'GET', signal }),
+
+    getSettings: (signal) => request<InstanceSettings>('getSettings', { method: 'GET', signal }),
+
+    async setSettings(settings, signal) {
+      await request<unknown>('setSettings', { method: 'POST', body: settings, signal })
+    },
 
     async checkAccount(phoneNumber, signal) {
       const data = await request<{ exist: boolean; chatId?: string } | { status: false; reason: string }>(

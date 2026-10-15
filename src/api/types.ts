@@ -18,6 +18,26 @@ export interface StateInstanceResponse {
   stateInstance: InstanceState
 }
 
+/** Настройки инстанса, влияющие на получение уведомлений через HTTP API. */
+export interface InstanceSettings {
+  webhookUrl?: string
+  incomingWebhook?: 'yes' | 'no' | (string & {})
+  outgoingWebhook?: 'yes' | 'no' | (string & {})
+  outgoingMessageWebhook?: 'yes' | 'no' | (string & {})
+  outgoingAPIMessageWebhook?: 'yes' | 'no' | (string & {})
+  stateWebhook?: 'yes' | 'no' | (string & {})
+}
+
+/** Параметры, которые приложение может включить для работы HTTP-поллера. */
+export type NotificationSettings = Pick<
+  InstanceSettings,
+  | 'incomingWebhook'
+  | 'outgoingWebhook'
+  | 'outgoingMessageWebhook'
+  | 'outgoingAPIMessageWebhook'
+  | 'stateWebhook'
+>
+
 export type CheckAccountResult = { exist: true; chatId: string } | { exist: false }
 
 export interface SendMessageResponse {

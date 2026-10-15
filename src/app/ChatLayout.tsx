@@ -3,6 +3,7 @@ import { ChatList } from '../features/chats/ChatList'
 import { NewChatForm } from '../features/chats/NewChatForm'
 import { useHistorySync } from '../features/history/useHistorySync'
 import { ConnectionStatus } from '../features/polling/ConnectionStatus'
+import { NotificationSettingsWarning } from '../features/polling/NotificationSettingsWarning'
 import { useNotificationPolling } from '../features/polling/useNotificationPolling'
 import { useChatStore } from '../store/chatStore'
 import { useSessionStore } from '../store/sessionStore'
@@ -28,6 +29,7 @@ export function ChatLayout() {
             Выйти
           </button>
         </header>
+        <NotificationSettingsWarning />
         <NewChatForm />
         <nav className={styles.chats}>
           <ChatList />
