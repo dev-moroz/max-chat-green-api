@@ -1,9 +1,8 @@
-/** Заглушка: экраны входа и чата появятся на этапах 4–8. */
+import { LoginScreen } from '../features/auth/LoginScreen'
+import { useSessionStore } from '../store/sessionStore'
+import { ChatLayout } from './ChatLayout'
+
 export function App() {
-  return (
-    <main className="app-placeholder">
-      <h1>MAX Chat</h1>
-      <p>Клиент для MAX на Green-API. Интерфейс в разработке.</p>
-    </main>
-  )
+  const isLoggedIn = useSessionStore((s) => s.credentials !== null)
+  return isLoggedIn ? <ChatLayout /> : <LoginScreen />
 }
