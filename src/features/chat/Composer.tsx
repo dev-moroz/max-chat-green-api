@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { MAX_MESSAGE_LENGTH } from '../../api'
 import styles from './Composer.module.css'
 
@@ -11,16 +11,6 @@ const COUNTER_THRESHOLD = MAX_MESSAGE_LENGTH - 500
 /** Черновик сбрасывается при смене чата: родитель передаёт key={chatId} */
 export function Composer({ onSend }: ComposerProps) {
   const [text, setText] = useState('')
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  // Автовысота: растём по содержимому до max-height из CSS
-  useLayoutEffect(() => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    // + рамка: scrollHeight её не включает, а box-sizing у нас border-box
-    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`
-  }, [text])
 
   const trimmedLength = text.trim().length
   const isTooLong = text.length > MAX_MESSAGE_LENGTH
@@ -49,7 +39,6 @@ export function Composer({ onSend }: ComposerProps) {
     <form className={styles.composer} onSubmit={handleSubmit}>
       <div className={styles.field}>
         <textarea
-          ref={textareaRef}
           className={styles.input}
           value={text}
           onChange={(e) => setText(e.target.value)}
