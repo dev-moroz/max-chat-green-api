@@ -115,4 +115,26 @@ describe('createGreenApiClient', () => {
       .catch((e: unknown) => e)
     expect(error).toBeInstanceOf(DOMException)
   })
+
+  it('getChatHistory — POST с chatId и count; мусор в ответе отбрасывается', async () => {
+    const fetchImpl = mockFetch(200, '[{"type":"incoming","idMessage":"1"}, null, 5]')
+    const items = await createGreenApiClient(credentials, fetchImpl).getChatHistory('100', 50)
+
+    expect(items).toEqual([{ type: 'incoming', idMessage: '1' }])
+    expect(fetchImpl.mock.calls[0][0]).toMatch(/\/getChatHistory\/secret-token$/)
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1]?.body))).toEqual({ chatId: '100', count: 50 })
+  })
+
+  it('getChats — список чатов; числовой chatId приводится к строке, без chatId — отбрасывается', async () => {
+    const fetchImpl = mockFetch(
+      200,
+      '[{"chatId":"100","name":"А","type":"user","phoneNumber":0},{"chatId":200,"name":"Б","type":"user","phoneNumber":0},{"name":"без id"}]',
+    )
+    const chats = await createGreenApiClient(credentials, fetchImpl).getChats()
+    expect(chats.map((c) => c.chatId)).toEqual(['100', '200'])
+  })
+
+  it('getChats — не массив в ответе даёт пустой список', async () => {
+    await expect(createGreenApiClient(credentials, mockFetch(200, '{}')).getChats()).resolves.toEqual([])
+  })
 })

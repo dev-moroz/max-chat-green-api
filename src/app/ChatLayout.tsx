@@ -1,6 +1,7 @@
 import { ChatPanel } from '../features/chat/ChatPanel'
 import { ChatList } from '../features/chats/ChatList'
 import { NewChatForm } from '../features/chats/NewChatForm'
+import { useHistorySync } from '../features/history/useHistorySync'
 import { ConnectionStatus } from '../features/polling/ConnectionStatus'
 import { useNotificationPolling } from '../features/polling/useNotificationPolling'
 import { useChatStore } from '../store/chatStore'
@@ -13,6 +14,7 @@ export function ChatLayout() {
   const activeChatId = useChatStore((s) => s.activeChatId)
   const selectChat = useChatStore((s) => s.selectChat)
   const connection = useNotificationPolling()
+  useHistorySync()
 
   return (
     <div className={styles.layout} data-chat-open={activeChatId ? true : undefined}>

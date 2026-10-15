@@ -20,7 +20,7 @@ export function useNotificationPolling(): PollerStatus {
       client: getApiClient(),
       signal: controller.signal,
       lockName: `max-chat:poller:${credentials.idInstance}`,
-      onMessage: (event) => useChatStore.getState().applyTextMessage(event),
+      onMessage: (event) => useChatStore.getState().applyMessage(event),
       onStatus: setStatus,
     })
 

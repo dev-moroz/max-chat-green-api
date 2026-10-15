@@ -23,6 +23,7 @@
   border: 1px solid transparent;
   border-radius: 20px;
   line-height: 20px;
+  height: 100% !important;
 }
 
 .input:focus {

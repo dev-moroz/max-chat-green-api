@@ -1,4 +1,5 @@
 import { chatTitle, useChatStore } from '../../store/chatStore'
+import { useHistoryStore } from '../../store/historyStore'
 import { getApiClient } from '../../store/sessionStore'
 import { Avatar } from '../../shared/ui/Avatar'
 import { formatPhone } from '../../shared/lib/phone'
@@ -14,6 +15,7 @@ interface ChatPanelProps {
 
 export function ChatPanel({ chatId, onBack }: ChatPanelProps) {
   const chat = useChatStore((s) => s.chats[chatId])
+  const historyStatus = useHistoryStore((s) => s.status[chatId])
   if (!chat) return null
 
   const title = chatTitle(chat)
@@ -34,6 +36,10 @@ export function ChatPanel({ chatId, onBack }: ChatPanelProps) {
       <MessageFeed
         chatId={chatId}
         messages={chat.messages}
+        historyStatus={historyStatus}
+        onRetryHistory={() =>
+          useHistoryStore.getState().loader?.request(chatId, { priority: true, force: true })
+        }
         onRetry={(localId) => void retryMessage(chatId, localId, getApiClient())}
       />
       <Composer key={chatId} onSend={(text) => void sendMessage(chatId, text, getApiClient())} />

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { TextMessageEvent } from '../api'
+import type { ChatMessageEvent } from '../api'
 import { sortChatsByActivity, useChatStore } from './chatStore'
 
 const store = () => useChatStore.getState()
 
-function event(overrides: Partial<TextMessageEvent> = {}): TextMessageEvent {
+function event(overrides: Partial<ChatMessageEvent> = {}): ChatMessageEvent {
   return {
     direction: 'incoming',
     idMessage: 'm1',
@@ -24,7 +24,7 @@ beforeEach(() => {
 describe('chatStore', () => {
   it('openChat создаёт чат и делает его активным; повторный вызов не теряет историю', () => {
     store().openChat({ chatId: '100', phone: '79991234567' })
-    store().applyTextMessage(event())
+    store().applyMessage(event())
     store().openChat({ chatId: '100' })
 
     expect(store().activeChatId).toBe('100')
@@ -39,18 +39,18 @@ describe('chatStore', () => {
   })
 
   it('входящее сообщение от неизвестного chatId создаёт чат с именем отправителя', () => {
-    store().applyTextMessage(event())
+    store().applyMessage(event())
     expect(store().chats['100']).toMatchObject({ name: 'Друг', unreadCount: 1 })
   })
 
   it('не считает непрочитанными сообщения в открытом чате', () => {
     store().openChat({ chatId: '100' })
-    store().applyTextMessage(event())
+    store().applyMessage(event())
     expect(store().chats['100'].unreadCount).toBe(0)
   })
 
   it('selectChat сбрасывает счётчик непрочитанных', () => {
-    store().applyTextMessage(event())
+    store().applyMessage(event())
     store().selectChat('100')
     expect(store().chats['100'].unreadCount).toBe(0)
   })
@@ -61,7 +61,7 @@ describe('chatStore', () => {
     expect(store().chats['100'].messages[0].status).toBe('pending')
 
     store().markMessageSent('100', localId, 'srv-1')
-    store().applyTextMessage(event({ direction: 'outgoing', idMessage: 'srv-1' }))
+    store().applyMessage(event({ direction: 'outgoing', idMessage: 'srv-1' }))
 
     const messages = store().chats['100'].messages
     expect(messages).toHaveLength(1)
@@ -72,7 +72,7 @@ describe('chatStore', () => {
     store().openChat({ chatId: '100' })
     const localId = store().addPendingMessage('100', 'Привет')
 
-    store().applyTextMessage(event({ direction: 'outgoing', idMessage: 'srv-1', timestamp: Date.now() }))
+    store().applyMessage(event({ direction: 'outgoing', idMessage: 'srv-1', timestamp: Date.now() }))
     store().markMessageSent('100', localId, 'srv-1')
 
     const messages = store().chats['100'].messages
@@ -93,15 +93,13 @@ describe('chatStore', () => {
     store().openChat({ chatId: '100' })
     store().addPendingMessage('100', 'Привет') // локальное время в мс
     // сервер отдаёт секунды — после умножения время может оказаться меньше локального
-    store().applyTextMessage(
-      event({ idMessage: 'reply', timestamp: Math.floor(Date.now() / 1000) * 1000 - 500 }),
-    )
+    store().applyMessage(event({ idMessage: 'reply', timestamp: Math.floor(Date.now() / 1000) * 1000 - 500 }))
     expect(store().chats['100'].messages.map((m) => m.text)).toEqual(['Привет', 'Привет'])
     expect(store().chats['100'].messages[1].id).toBe('reply')
   })
 
   it('bindInstance к другому инстансу очищает историю', () => {
-    store().applyTextMessage(event())
+    store().applyMessage(event())
     store().bindInstance('inst-1')
     expect(Object.keys(store().chats)).toHaveLength(1)
     store().bindInstance('inst-2')
@@ -109,9 +107,47 @@ describe('chatStore', () => {
   })
 
   it('sortChatsByActivity: свежие сверху, пустой новый чат — по времени создания', () => {
-    store().applyTextMessage(event({ chatId: 'old', idMessage: 'x', timestamp: 1_000 }))
-    store().applyTextMessage(event({ chatId: 'new', idMessage: 'y', timestamp: 5_000 }))
+    store().applyMessage(event({ chatId: 'old', idMessage: 'x', timestamp: 1_000 }))
+    store().applyMessage(event({ chatId: 'new', idMessage: 'y', timestamp: 5_000 }))
     store().openChat({ chatId: 'empty' })
     expect(sortChatsByActivity(store().chats).map((c) => c.chatId)).toEqual(['empty', 'new', 'old'])
+  })
+
+  it('importChats добавляет чаты с номером и именем, каналы пропускает, существующие не затирает', () => {
+    store().openChat({ chatId: '100', name: 'Свой' })
+    store().importChats([
+      { chatId: '100', name: 'Серверное имя', type: 'user', phoneNumber: 79991234567 },
+      { chatId: '200', name: 'Мария', type: 'user', phoneNumber: 0 },
+      { chatId: '-300', name: 'Новости', type: 'channel', phoneNumber: 0 },
+    ])
+    expect(store().chats['100']).toMatchObject({ name: 'Свой', phone: '79991234567' })
+    expect(store().chats['200']).toMatchObject({ name: 'Мария', phone: undefined, messages: [] })
+    expect(store().chats['-300']).toBeUndefined()
+    // импортированный номер избавляет от лишнего CheckAccount
+    expect(store().findChatIdByPhone('79991234567')).toBe('100')
+  })
+
+  it('mergeHistory: сортирует историю, убирает дубли, сохраняет локальные pending и новые сообщения', () => {
+    store().openChat({ chatId: '100' })
+    store().applyMessage(event({ idMessage: 'live', text: 'из очереди', timestamp: 5_000 }))
+    store().applyMessage(event({ idMessage: 'h2', text: 'дубль', timestamp: 2_000 }))
+    store().addPendingMessage('100', 'ещё отправляется')
+
+    store().mergeHistory('100', [
+      event({ idMessage: 'h2', text: 'второе', timestamp: 2_000 }),
+      event({ idMessage: 'h1', text: 'первое', timestamp: 1_000, direction: 'outgoing' }),
+    ])
+
+    const messages = store().chats['100'].messages
+    expect(messages.map((m) => m.text)).toEqual(['первое', 'второе', 'из очереди', 'ещё отправляется'])
+    expect(messages[0].status).toBe('sent')
+    expect(store().chats['100'].unreadCount).toBe(0)
+  })
+
+  it('mergeHistory: сообщение из очереди старше окна истории встаёт перед ним', () => {
+    store().openChat({ chatId: '100' })
+    store().applyMessage(event({ idMessage: 'old', text: 'старое', timestamp: 500 }))
+    store().mergeHistory('100', [event({ idMessage: 'h1', text: 'история', timestamp: 1_000 })])
+    expect(store().chats['100'].messages.map((m) => m.text)).toEqual(['старое', 'история'])
   })
 })

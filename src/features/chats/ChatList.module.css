@@ -86,3 +86,7 @@
   line-height: 20px;
   text-align: center;
 }
+
+.media {
+  color: var(--color-accent);
+}

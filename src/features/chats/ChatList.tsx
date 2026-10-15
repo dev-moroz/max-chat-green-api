@@ -62,6 +62,8 @@ function ChatListItem({ chat, isActive, onSelect }: ChatListItemProps) {
             {last ? (
               <>
                 {last.direction === 'outgoing' && <span className={styles.you}>Вы: </span>}
+                {last.media && <span className={styles.media}>{last.media}</span>}
+                {last.media && last.text ? ', ' : ''}
                 {last.text}
               </>
             ) : (

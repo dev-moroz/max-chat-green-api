@@ -6,5 +6,5 @@ export {
 } from './greenApi'
 export type { GreenApiClient } from './greenApi'
 export { ApiError, isAbortError } from './errors'
-export { parseTextMessage } from './notifications'
+export { parseHistoryItem, parseNotification } from './notifications'
 export type * from './types'

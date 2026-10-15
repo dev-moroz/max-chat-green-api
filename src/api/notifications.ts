@@ -1,4 +1,4 @@
-import type { TextMessageEvent, WebhookBody } from './types'
+import type { ChatMessageEvent, HistoryItem, WebhookBody } from './types'
 
 /**
  * Типы уведомлений, которые несут сообщения:
@@ -6,18 +6,38 @@ import type { TextMessageEvent, WebhookBody } from './types'
  * - outgoingMessageReceived — отправлено с телефона (или в «Избранное»)
  * - outgoingAPIMessageReceived — отправлено через API, в том числе этим приложением
  */
-const DIRECTION_BY_TYPE: Record<string, TextMessageEvent['direction']> = {
+const DIRECTION_BY_TYPE: Record<string, ChatMessageEvent['direction']> = {
   incomingMessageReceived: 'incoming',
   outgoingMessageReceived: 'outgoing',
   outgoingAPIMessageReceived: 'outgoing',
 }
 
 /**
- * Извлекает текстовое сообщение из уведомления.
- * Возвращает null для всего остального: статусов, медиа, сервисных событий.
- * Тело приходит из сети, поэтому каждое поле проверяется в рантайме, а не приводится через `as`.
+ * Задание требует только текст, поэтому вложения не скачиваем и не отправляем.
+ * Но если собеседник прислал фото, молча пропустить его — значит исказить переписку,
+ * поэтому показываем подпись-заглушку.
  */
-export function parseTextMessage(body: WebhookBody): TextMessageEvent | null {
+const MEDIA_LABELS: Record<string, string> = {
+  imageMessage: 'Фото',
+  videoMessage: 'Видео',
+  audioMessage: 'Аудио',
+  documentMessage: 'Документ',
+  stickerMessage: 'Стикер',
+  locationMessage: 'Геолокация',
+  contactMessage: 'Контакт',
+  pollMessage: 'Опрос',
+}
+
+interface Content {
+  text: string
+  media?: string
+}
+
+/**
+ * Извлекает сообщение из уведомления. Возвращает null для статусов, сервисных событий
+ * и неизвестных типов. Тело приходит из сети, поэтому каждое поле проверяется в рантайме.
+ */
+export function parseNotification(body: WebhookBody): ChatMessageEvent | null {
   const direction = DIRECTION_BY_TYPE[body.typeWebhook]
   if (!direction) return null
 
@@ -27,32 +47,75 @@ export function parseTextMessage(body: WebhookBody): TextMessageEvent | null {
 
   const chatId = asId(senderData.chatId)
   const idMessage = asId(body.idMessage)
-  const text = extractText(messageData)
-  if (!chatId || !idMessage || text === null) return null
-
-  const timestampSeconds = typeof body.timestamp === 'number' ? body.timestamp : Date.now() / 1000
+  const content = notificationContent(messageData)
+  if (!chatId || !idMessage || !content) return null
 
   return {
     direction,
     idMessage,
     chatId,
     chatName: asString(senderData.chatName) || asString(senderData.senderName) || undefined,
-    text,
-    timestamp: Math.round(timestampSeconds * 1000),
+    ...content,
+    timestamp: toMs(body.timestamp),
   }
 }
 
-function extractText(messageData: Record<string, unknown>): string | null {
-  switch (messageData.typeMessage) {
+/** Разбирает элемент getChatHistory */
+export function parseHistoryItem(item: HistoryItem, chatId: string): ChatMessageEvent | null {
+  const direction = item.type === 'incoming' || item.type === 'outgoing' ? item.type : null
+  const idMessage = asId(item.idMessage)
+  const content = historyContent(item)
+  if (!direction || !idMessage || !content) return null
+
+  return {
+    direction,
+    idMessage,
+    chatId: asId(item.chatId) ?? chatId,
+    ...content,
+    timestamp: toMs(item.timestamp),
+  }
+}
+
+function notificationContent(messageData: Record<string, unknown>): Content | null {
+  const type = messageData.typeMessage
+  switch (type) {
     case 'textMessage':
-      return asString(asRecord(messageData.textMessageData)?.textMessage)
+      return textContent(asRecord(messageData.textMessageData)?.textMessage)
     // Текст со ссылкой и ответ с цитатой — тоже текст для пользователя
     case 'extendedTextMessage':
     case 'quotedMessage':
-      return asString(asRecord(messageData.extendedTextMessageData)?.text)
-    default:
-      return null
+      return textContent(asRecord(messageData.extendedTextMessageData)?.text)
   }
+  const file = asRecord(messageData.fileMessageData)
+  return mediaContent(type, asString(file?.caption), asString(file?.fileName))
+}
+
+function historyContent(item: HistoryItem): Content | null {
+  const type = item.typeMessage
+  switch (type) {
+    case 'textMessage':
+      return textContent(item.textMessage)
+    case 'extendedTextMessage':
+    case 'quotedMessage':
+      return textContent(item.textMessage ?? asRecord(item.extendedTextMessage)?.text)
+  }
+  return mediaContent(type, asString(item.caption), asString(item.fileName))
+}
+
+function textContent(value: unknown): Content | null {
+  const text = asString(value)
+  return text === null ? null : { text }
+}
+
+function mediaContent(type: unknown, caption: string | null, fileName: string | null): Content | null {
+  const label = typeof type === 'string' ? MEDIA_LABELS[type] : undefined
+  if (!label) return null
+  const media = type === 'documentMessage' && fileName ? `${label}: ${fileName}` : label
+  return { text: caption ?? '', media }
+}
+
+function toMs(seconds: unknown): number {
+  return typeof seconds === 'number' && Number.isFinite(seconds) ? Math.round(seconds * 1000) : Date.now()
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

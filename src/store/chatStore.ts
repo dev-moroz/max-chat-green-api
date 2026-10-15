@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { TextMessageEvent } from '../api'
+import type { ChatInfo, ChatMessageEvent } from '../api'
 import { formatPhone } from '../shared/lib/phone'
 import type { Chat, ChatMessage } from './types'
 
@@ -26,7 +26,11 @@ interface ChatState {
   markMessageRetrying(chatId: string, localId: string): void
 
   /** Применить сообщение из уведомления (входящее или исходящее с другого устройства) */
-  applyTextMessage(event: TextMessageEvent): void
+  applyMessage(event: ChatMessageEvent): void
+  /** Добавить чаты из getChats; существующие не трогаются, кроме недостающих имени и номера */
+  importChats(chats: ChatInfo[]): void
+  /** Слить историю из getChatHistory с тем, что уже есть локально */
+  mergeHistory(chatId: string, events: ChatMessageEvent[]): void
 }
 
 export const useChatStore = create<ChatState>()(
@@ -104,7 +108,7 @@ export const useChatStore = create<ChatState>()(
         set((state) => setMessageStatus(state, chatId, localId, 'pending'))
       },
 
-      applyTextMessage(event) {
+      applyMessage(event) {
         set((state) => {
           const existing = state.chats[event.chatId]
           const chat: Chat = existing ?? {
@@ -117,14 +121,7 @@ export const useChatStore = create<ChatState>()(
           // Дедупликация: своё сообщение, отправленное через API, приходит ещё и уведомлением
           if (chat.messages.some((m) => m.idMessage === event.idMessage)) return state
 
-          const message: ChatMessage = {
-            id: event.idMessage,
-            idMessage: event.idMessage,
-            direction: event.direction,
-            text: event.text,
-            timestamp: event.timestamp,
-            ...(event.direction === 'outgoing' ? { status: 'sent' as const } : {}),
-          }
+          const message = toMessage(event)
 
           const isActive = state.activeChatId === event.chatId
           const updated: Chat = {
@@ -138,6 +135,49 @@ export const useChatStore = create<ChatState>()(
               event.direction === 'incoming' && !isActive ? chat.unreadCount + 1 : chat.unreadCount,
           }
           return { chats: { ...state.chats, [event.chatId]: updated } }
+        })
+      },
+
+      importChats(infos) {
+        set((state) => {
+          const chats = { ...state.chats }
+          infos.forEach((info, index) => {
+            if (info.type === 'channel') return // каналы только для чтения — писать в них нельзя
+            const phone = info.phoneNumber > 0 ? String(info.phoneNumber) : undefined
+            const name = info.name || undefined
+            const existing = chats[info.chatId]
+            chats[info.chatId] = existing
+              ? { ...existing, name: existing.name ?? name, phone: existing.phone ?? phone }
+              : // Пустые импортированные чаты — в конец списка в порядке сервера, пока не подгрузится история
+                { chatId: info.chatId, name, phone, messages: [], unreadCount: 0, createdAt: -index }
+          })
+          return { chats }
+        })
+      },
+
+      mergeHistory(chatId, events) {
+        set((state) => {
+          const chat = state.chats[chatId]
+          if (!chat) return state
+
+          // Внутри истории все времена серверные, поэтому здесь сортировка по timestamp корректна
+          const history = events
+            .filter((e) => e.chatId === chatId)
+            .sort((a, b) => a.timestamp - b.timestamp)
+            .map(toMessage)
+          if (history.length === 0) return state
+
+          const historyIds = new Set(history.map((m) => m.idMessage))
+          const firstTimestamp = history[0].timestamp
+          // Локальные сообщения, которых нет в истории: pending/failed и пришедшие из очереди.
+          // Те, что старше окна истории, ставим перед ним, остальные — после
+          const extras = chat.messages.filter((m) => !m.idMessage || !historyIds.has(m.idMessage))
+          const older = extras.filter((m) => m.idMessage && m.timestamp < firstTimestamp)
+          const newer = extras.filter((m) => !older.includes(m))
+
+          return {
+            chats: { ...state.chats, [chatId]: { ...chat, messages: [...older, ...history, ...newer] } },
+          }
         })
       },
     }),
@@ -164,6 +204,18 @@ export const useChatStore = create<ChatState>()(
     },
   ),
 )
+
+function toMessage(event: ChatMessageEvent): ChatMessage {
+  return {
+    id: event.idMessage,
+    idMessage: event.idMessage,
+    direction: event.direction,
+    text: event.text,
+    ...(event.media ? { media: event.media } : {}),
+    timestamp: event.timestamp,
+    ...(event.direction === 'outgoing' ? { status: 'sent' as const } : {}),
+  }
+}
 
 function updateChat(state: ChatState, chatId: string, update: (chat: Chat) => Chat): Partial<ChatState> {
   const chat = state.chats[chatId]

@@ -1,4 +1,5 @@
-import { isAbortError, parseTextMessage, type GreenApiClient, type TextMessageEvent } from '../api'
+import { isAbortError, parseNotification, type GreenApiClient, type ChatMessageEvent } from '../api'
+import { abortableSleep } from '../shared/lib/sleep'
 
 /**
  * connecting — первый запрос ещё не вернулся
@@ -10,7 +11,7 @@ export type PollerStatus = 'connecting' | 'online' | 'offline' | 'standby'
 
 export interface PollerOptions {
   client: Pick<GreenApiClient, 'receiveNotification' | 'deleteNotification'>
-  onMessage(event: TextMessageEvent): void
+  onMessage(event: ChatMessageEvent): void
   onStatus?(status: PollerStatus): void
   signal: AbortSignal
   /**
@@ -79,7 +80,7 @@ async function pollLoop(options: PollerOptions, report: (status: PollerStatus) =
     if (!notification) continue // за время long-poll ничего не пришло
 
     try {
-      const event = parseTextMessage(notification.body)
+      const event = parseNotification(notification.body)
       if (event) options.onMessage(event)
     } catch (error) {
       // Ошибка в обработчике не должна блокировать очередь — уведомление всё равно удаляем
@@ -103,19 +104,4 @@ function dedupeStatus(onStatus: PollerOptions['onStatus']) {
     last = status
     onStatus?.(status)
   }
-}
-
-function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) return reject(signal.reason)
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort)
-      resolve()
-    }, ms)
-    function onAbort() {
-      clearTimeout(timer)
-      reject(signal.reason)
-    }
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
 }

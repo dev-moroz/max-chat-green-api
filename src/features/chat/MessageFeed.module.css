@@ -109,3 +109,32 @@
 .retry:hover {
   text-decoration: underline;
 }
+
+.historyNotice {
+  align-self: center;
+  margin: 0 0 8px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.media {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 2px;
+  color: var(--color-accent);
+  font-size: 14px;
+  font-style: italic;
+}

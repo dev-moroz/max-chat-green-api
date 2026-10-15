@@ -56,7 +56,7 @@ describe('createChat', () => {
   })
 
   it('дописывает номер к чату, который уже появился из входящего сообщения', async () => {
-    useChatStore.getState().applyTextMessage({
+    useChatStore.getState().applyMessage({
       direction: 'incoming',
       idMessage: 'm1',
       chatId: '100',

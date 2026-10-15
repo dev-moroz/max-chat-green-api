@@ -1,7 +1,9 @@
 import { ApiError, isAbortError } from './errors'
 import type {
+  ChatInfo,
   CheckAccountResult,
   Credentials,
+  HistoryItem,
   ReceivedNotification,
   SendMessageResponse,
   StateInstanceResponse,
@@ -20,6 +22,10 @@ export interface GreenApiClient {
   /** Возвращает null, если за время long-poll уведомлений не пришло */
   receiveNotification(signal?: AbortSignal): Promise<ReceivedNotification | null>
   deleteNotification(receiptId: number, signal?: AbortSignal): Promise<void>
+  /** Список чатов аккаунта. Последних сообщений не содержит */
+  getChats(signal?: AbortSignal): Promise<ChatInfo[]>
+  /** Последние count сообщений чата. Лимит API — 1 запрос в секунду */
+  getChatHistory(chatId: string, count: number, signal?: AbortSignal): Promise<HistoryItem[]>
 }
 
 interface RequestOptions {
@@ -115,7 +121,31 @@ export function createGreenApiClient(
         signal,
       })
     },
+
+    async getChats(signal) {
+      const data = await request<unknown>('getChats', { method: 'GET', signal })
+      return Array.isArray(data) ? data.filter(isChatInfo) : []
+    },
+
+    async getChatHistory(chatId, count, signal) {
+      const data = await request<unknown>('getChatHistory', {
+        method: 'POST',
+        body: { chatId, count },
+        signal,
+      })
+      return Array.isArray(data) ? data.filter(isRecord) : []
+    },
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
+
+function isChatInfo(value: unknown): value is ChatInfo {
+  if (!isRecord(value)) return false
+  if (typeof value.chatId === 'number') value.chatId = String(value.chatId)
+  return typeof value.chatId === 'string' && value.chatId !== ''
 }
 
 function extractErrorMessage(text: string, status: number): string {

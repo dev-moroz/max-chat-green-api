@@ -1,17 +1,20 @@
 import { Fragment, useLayoutEffect, useRef } from 'react'
+import type { HistoryStatus } from '../../services/historyLoader'
 import type { ChatMessage } from '../../store/types'
 import styles from './MessageFeed.module.css'
 
 interface MessageFeedProps {
   chatId: string
   messages: ChatMessage[]
+  historyStatus?: HistoryStatus
   onRetry(localId: string): void
+  onRetryHistory(): void
 }
 
 /** Насколько близко к низу (px) считаем, что пользователь «внизу» и автоскролл уместен */
 const STICK_THRESHOLD = 120
 
-export function MessageFeed({ chatId, messages, onRetry }: MessageFeedProps) {
+export function MessageFeed({ chatId, messages, historyStatus, onRetry, onRetryHistory }: MessageFeedProps) {
   const feedRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
   const prevChatIdRef = useRef<string | null>(null)
@@ -27,7 +30,7 @@ export function MessageFeed({ chatId, messages, onRetry }: MessageFeedProps) {
     if (chatChanged || isAtBottomRef.current || lastMessage?.status === 'pending') {
       el.scrollTop = el.scrollHeight
     }
-  }, [chatId, messages.length, lastMessage?.status])
+  }, [chatId, messages.length, lastMessage?.id, lastMessage?.status])
 
   function handleScroll() {
     const el = feedRef.current
@@ -37,8 +40,21 @@ export function MessageFeed({ chatId, messages, onRetry }: MessageFeedProps) {
 
   return (
     <div ref={feedRef} className={styles.feed} onScroll={handleScroll} role="log" aria-live="polite">
+      {historyStatus === 'loading' && (
+        <p className={styles.historyNotice} role="status">
+          Загружаем историю…
+        </p>
+      )}
+      {historyStatus === 'error' && (
+        <p className={styles.historyNotice} role="alert">
+          Не удалось загрузить историю.{' '}
+          <button type="button" className={styles.link} onClick={onRetryHistory}>
+            Повторить
+          </button>
+        </p>
+      )}
       {messages.length === 0 ? (
-        <p className={styles.notice}>Сообщений пока нет. Напишите первым.</p>
+        historyStatus !== 'loading' && <p className={styles.notice}>Сообщений пока нет. Напишите первым.</p>
       ) : (
         <ol className={styles.list}>
           {messages.map((message, index) => {
@@ -65,7 +81,21 @@ function MessageBubble({ message, onRetry }: { message: ChatMessage; onRetry(loc
   return (
     <li className={styles.row} data-outgoing={isOutgoing || undefined}>
       <div className={styles.bubble} data-status={message.status}>
-        <p className={styles.text}>{message.text}</p>
+        {message.media && (
+          <span className={styles.media}>
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path
+                d="M10.5 4.5 5.2 9.8a1.5 1.5 0 0 0 2.1 2.1l5.6-5.6a3 3 0 0 0-4.2-4.2L3 7.8a4.5 4.5 0 0 0 6.4 6.4l4.1-4.2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+            </svg>
+            {message.media}
+          </span>
+        )}
+        {message.text && <p className={styles.text}>{message.text}</p>}
         <span className={styles.meta}>
           <time dateTime={new Date(message.timestamp).toISOString()}>{formatTime(message.timestamp)}</time>
           {isOutgoing && <StatusIcon status={message.status} />}

@@ -7,6 +7,8 @@ export interface ChatMessage {
   idMessage?: string
   direction: 'incoming' | 'outgoing'
   text: string
+  /** Подпись вложения («Фото», «Документ: …»); сами файлы не загружаются */
+  media?: string
   /** Unix-время в миллисекундах */
   timestamp: number
   /** Только для исходящих, отправленных из этого приложения */

@@ -38,15 +38,33 @@ export interface ReceivedNotification {
   body: WebhookBody
 }
 
-/** Нормализованное текстовое сообщение, извлечённое из уведомления. */
-export interface TextMessageEvent {
+/** Нормализованное сообщение из уведомления или истории чата. */
+export interface ChatMessageEvent {
   /** incoming — от собеседника; outgoing — отправлено с телефона или через API */
   direction: 'incoming' | 'outgoing'
   idMessage: string
   chatId: string
   /** Имя чата, если сервер его прислал */
   chatName?: string
+  /** Текст или подпись к вложению; может быть пустым у вложения без подписи */
   text: string
+  /** Подпись вложения для отображения: «Фото», «Документ: отчёт.pdf». Сами файлы не загружаем */
+  media?: string
   /** Unix-время в миллисекундах */
   timestamp: number
 }
+
+/** Чат из getChats */
+export interface ChatInfo {
+  chatId: string
+  name: string
+  type: 'user' | 'group' | 'channel' | 'bot' | (string & {})
+  /** 0, если номер скрыт или это группа */
+  phoneNumber: number
+}
+
+/**
+ * Элемент getChatHistory. Поля плоские, в отличие от уведомлений.
+ * Как и уведомления, разбирается рантайм-проверками в notifications.ts.
+ */
+export type HistoryItem = Record<string, unknown>
