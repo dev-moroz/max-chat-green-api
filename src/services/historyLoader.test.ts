@@ -46,6 +46,24 @@ function setup(getChatHistory: GreenApiClient['getChatHistory']) {
 }
 
 describe('historyLoader', () => {
+  it('по умолчанию запрашивает полную доступную историю', async () => {
+    const controller = new AbortController()
+    const getChatHistory = vi.fn<GreenApiClient['getChatHistory']>(async () => [])
+    const loader = createHistoryLoader({
+      client: { getChatHistory },
+      signal: controller.signal,
+      onHistory: () => undefined,
+      onStatus: () => undefined,
+      minIntervalMs: 0,
+      sleep: async () => undefined,
+    })
+
+    loader.request('chat-1')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(getChatHistory).toHaveBeenCalledWith('chat-1', 5_000, expect.any(AbortSignal))
+  })
+
   it('грузит последовательно, с паузой между запросами и нужным count', async () => {
     const t = setup(async (chatId) => [item(`${chatId}-1`)])
     t.loader.request('a')

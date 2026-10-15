@@ -8,7 +8,7 @@ export interface HistoryLoaderOptions {
   onHistory(chatId: string, events: ChatMessageEvent[]): void
   onStatus(chatId: string, status: HistoryStatus): void
   signal: AbortSignal
-  /** Сколько последних сообщений грузить на чат */
+  /** Сколько последних сообщений грузить на чат. MAX отдаёт до 5 000 за последние 3 месяца. */
   count?: number
   /** getChatHistory ограничен 1 запросом в секунду — держим паузу с запасом */
   minIntervalMs?: number
@@ -27,7 +27,7 @@ export interface HistoryLoader {
 /** Последовательная очередь запросов истории с паузой между ними. */
 export function createHistoryLoader(options: HistoryLoaderOptions): HistoryLoader {
   const { client, signal } = options
-  const count = options.count ?? 50
+  const count = options.count ?? 5_000
   const interval = options.minIntervalMs ?? 1_100
   const sleep = options.sleep ?? abortableSleep
 
