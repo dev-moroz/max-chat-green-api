@@ -89,10 +89,15 @@ describe('chatStore', () => {
     expect(store().chats['100'].messages[0].status).toBe('pending')
   })
 
-  it('сообщения упорядочены по времени, даже если пришли не по порядку', () => {
-    store().applyTextMessage(event({ idMessage: 'b', timestamp: 2_000 }))
-    store().applyTextMessage(event({ idMessage: 'a', timestamp: 1_000 }))
-    expect(store().chats['100'].messages.map((m) => m.id)).toEqual(['a', 'b'])
+  it('ответ с серверным временем «раньше» локального всё равно встаёт после отправленного', () => {
+    store().openChat({ chatId: '100' })
+    store().addPendingMessage('100', 'Привет') // локальное время в мс
+    // сервер отдаёт секунды — после умножения время может оказаться меньше локального
+    store().applyTextMessage(
+      event({ idMessage: 'reply', timestamp: Math.floor(Date.now() / 1000) * 1000 - 500 }),
+    )
+    expect(store().chats['100'].messages.map((m) => m.text)).toEqual(['Привет', 'Привет'])
+    expect(store().chats['100'].messages[1].id).toBe('reply')
   })
 
   it('bindInstance к другому инстансу очищает историю', () => {

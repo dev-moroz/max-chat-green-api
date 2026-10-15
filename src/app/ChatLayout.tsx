@@ -1,6 +1,8 @@
 import { ChatPanel } from '../features/chat/ChatPanel'
 import { ChatList } from '../features/chats/ChatList'
 import { NewChatForm } from '../features/chats/NewChatForm'
+import { ConnectionStatus } from '../features/polling/ConnectionStatus'
+import { useNotificationPolling } from '../features/polling/useNotificationPolling'
 import { useChatStore } from '../store/chatStore'
 import { useSessionStore } from '../store/sessionStore'
 import styles from './ChatLayout.module.css'
@@ -10,6 +12,7 @@ export function ChatLayout() {
   const logout = useSessionStore((s) => s.logout)
   const activeChatId = useChatStore((s) => s.activeChatId)
   const selectChat = useChatStore((s) => s.selectChat)
+  const connection = useNotificationPolling()
 
   return (
     <div className={styles.layout} data-chat-open={activeChatId ? true : undefined}>
@@ -17,9 +20,9 @@ export function ChatLayout() {
         <header className={styles.sidebarHeader}>
           <div>
             <h1 className={styles.sidebarTitle}>Чаты</h1>
-            <span className={styles.instance}>Инстанс {idInstance}</span>
+            <ConnectionStatus status={connection} />
           </div>
-          <button type="button" className={styles.logout} onClick={logout}>
+          <button type="button" className={styles.logout} onClick={logout} title={`Инстанс ${idInstance}`}>
             Выйти
           </button>
         </header>

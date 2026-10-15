@@ -130,7 +130,10 @@ export const useChatStore = create<ChatState>()(
           const updated: Chat = {
             ...chat,
             name: chat.name ?? event.chatName,
-            messages: insertByTime(chat.messages, message),
+            // Порядок — по поступлению: очередь Green-API отдаёт уведомления строго FIFO,
+            // а сортировка по timestamp ломается из-за секундной точности сервера
+            // и расхождения часов клиента и сервера
+            messages: [...chat.messages, message],
             unreadCount:
               event.direction === 'incoming' && !isActive ? chat.unreadCount + 1 : chat.unreadCount,
           }
@@ -178,12 +181,6 @@ function setMessageStatus(
     ...chat,
     messages: chat.messages.map((m) => (m.id === localId ? { ...m, status } : m)),
   }))
-}
-
-/** Уведомления приходят по порядку, но сообщение с телефона может оказаться старше локального pending */
-function insertByTime(messages: ChatMessage[], message: ChatMessage): ChatMessage[] {
-  const index = messages.findLastIndex((m) => m.timestamp <= message.timestamp)
-  return [...messages.slice(0, index + 1), message, ...messages.slice(index + 1)]
 }
 
 /** Чаты для сайдбара: свежие сверху. Возвращает новый массив — вызывать в useMemo, не в селекторе */
